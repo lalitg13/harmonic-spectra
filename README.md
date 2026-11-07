@@ -1,88 +1,78 @@
-# HarmonicSpectra
+# Harmonic Spectra
 
-[![Python](https://img.shields.io/badge/Python-3.9%20|%203.10%20|%203.11%20|%203.12%20|%203.15-3776ab.svg?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688.svg?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![SciPy](https://img.shields.io/badge/SciPy-1.10+-8caae6.svg?style=flat-square&logo=scipy&logoColor=white)](https://scipy.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
-[![Status: Production](https://img.shields.io/badge/Status-Production--Grade-00f3ff.svg?style=flat-square)](#)
+[![Python](https://img.shields.io/badge/Python-3.9%2B-3776ab?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.100%2B-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![SciPy](https://img.shields.io/badge/SciPy-1.10%2B-8caae6?style=flat-square&logo=scipy&logoColor=white)](https://scipy.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
 
-> [!NOTE]
-> A real-time audio analysis and spectrogram studio. Computes Fast Fourier Transforms (FFT), identifies musical pitch, and displays live frequency readouts on an audio engineering deck.
+A small browser studio that draws the frequencies inside a synthesized tone. A Python server builds the wave, runs a Fast Fourier Transform, and the page plots the spectrum, the harmonics, and a spectrogram.
 
----
+![Harmonic Spectra studio after analyzing a 440 Hz sawtooth](assets/studio-deck.png)
 
-## Overview
+The picture above is the running app, just after it loads. The tone is a **440 Hz sawtooth**, analyzed with a **2048-point Hann window** at **44.1 kHz**. Every number on the deck comes from that response.
 
-HarmonicSpectra converts audio waveforms into their component frequencies. It allows you to synthesize tones or use your microphone, detecting fundamental pitch (F0), overtone harmonics, and spectral brightness in real time.
+On this run the pitch readout is **441.69 Hz (A4, +7 cents)**. That estimate is autocorrelation. The harmonic table is coarser: it reports the loudest FFT bin near each multiple of the pitch. At 2048 points those bins are about **21.5 Hz** apart, so the first harmonic shows up at **430.7 Hz** even though the pitch estimate is 441.69 Hz. Spectral centroid is the center of mass of the whole spectrum. A sawtooth spreads energy across many harmonics, so the centroid here is **6904 Hz**. The 85% rolloff is **1765.7 Hz**. Flatness is **0.0145**, and the page labels that as tonal.
 
-```
-+-----------------------------------------------------------------------+
-| Audio Input  -->  FFT Engine  -->  Pitch Detection  -->  Studio Deck  |
-| (Synth / Mic)     (Fast Fourier)   (Harmonic Overtones)   (Spectrogram)|
-+-----------------------------------------------------------------------+
-```
+The green bars rise to about **−1.4 dB** for a second after each analysis, then drop. Turn the microphone on and both bars follow that single input level, and the oscilloscope draws the live wave. Pitch, the spectrum, and the harmonic table stay on the last tone the server analyzed.
 
----
+The corner of the header says "24-bit float." **AUDITION_SIGNAL** plays a 16-bit WAV.
 
-## Key Features
+## Same note, three shapes
 
-- **Live Frequency Spectrum**: Interactive canvas chart displaying frequency distribution from 20 Hz to 20 kHz.
-- **Harmonics Table**: Identifies fundamental frequency and calculates overtone ratios (1f, 2f, 3f, up to 8f).
-- **Pitch Detection**: Matches detected frequency to the nearest musical note and cents deviation (e.g. A4 +0.0c).
-- **Built-in Synthesizer**: Generates Sawtooth, Square, Triangle, Sine, Organ, and Frequency Sweep waveforms.
-- **Time-Domain Oscilloscope**: Visualizes raw audio wave shape with peak stereo VU meters.
-- **Microphone Support**: Stream live audio directly from your input device with a single click.
+These plots come from `src/synthesizer.py` and `src/dsp_engine.py`. The spectra use the same 2048-point Hann FFT the studio requests.
 
----
+![Sine, square, and sawtooth waves at 440 Hz, each with its spectrum](assets/waveform-spectra.png)
 
-## Supported Waveforms
+A sine wave is one peak at the fundamental. A square wave is dominated by odd harmonics (1f, 3f, 5f, …), with smaller spikes between them left over from the window. A sawtooth keeps even and odd harmonics, so the spectrum stays busy as the frequency climbs. Dots mark harmonics the detector reported above −30 dB.
 
-| Waveform | Tone Quality | Harmonic Content |
-|---|---|---|
-| **Sine** | Pure, smooth | Fundamental only (1f) |
-| **Sawtooth** | Bright, buzzy, sharp | All integer harmonics (1f, 2f, 3f, 4f...) |
-| **Square** | Hollow, woody, digital | Odd harmonics only (1f, 3f, 5f, 7f...) |
-| **Triangle** | Mellow, flute-like | Odd harmonics with rapid high-frequency decay |
-| **Organ** | Rich, complex, acoustic | Multi-octave harmonic blend |
-| **Chirp** | Sweeping, dynamic | Frequency sweep from 100 Hz to 4 kHz |
+## A sweep, as a spectrogram
 
----
+![Spectrogram of the built-in chirp, sweeping from 100 Hz to 4 kHz](assets/chirp-spectrogram.png)
 
-## Quickstart
+The **SWP** button glides from 100 Hz to 4 kHz. The picture is a 2 second glide from that same generator, using the studio's spectrogram settings: a Hann window, a 1024-point FFT, and a hop of 512 samples. The page draws a downsampled copy of that transform in the waterfall.
 
-### 1. Installation
+A steady sawtooth barely changes over time, so the waterfall in the studio screenshot is a flat band. The sweep is where time shows up. The large spectrum and the harmonic table only see the first FFT window, which on a sweep is the beginning of the glide, near 100 Hz. The pitch tracker is built for a steady note, so on a sweep it can settle on a different frequency. The spectrogram is the view that follows the glide.
+
+## Waveforms
+
+| Button | What gets generated |
+| --- | --- |
+| SAW | Sawtooth at the slider frequency |
+| SQR | Square wave. Odd harmonics dominate. |
+| TRI | Triangle wave |
+| SIN | Sine wave |
+| ORG | Added sines at 1×, 2×, 3×, 4×, and 8× the slider frequency |
+| SWP | Logarithmic sweep from 100 Hz to 4 kHz |
+
+The pitch slider runs from 55 Hz to 1760 Hz. FFT size is 1024, 2048, or 4096 points. Window choices are Hann, Hamming, Blackman, and rectangular.
+
+## Run it
+
+From this folder, with Python 3.9 or newer:
 
 ```bash
-cd ~/Desktop/Workspace/harmonic-spectra
 pip install -r requirements.txt
-```
-
-### 2. Run the Application
-
-```bash
 uvicorn src.app:app --host 127.0.0.1 --port 8001 --reload
 ```
 
-Open your browser and navigate to: **http://localhost:8001**
+Open [http://localhost:8001](http://localhost:8001).
 
-### 3. Run Tests
+### Tests
 
 ```bash
 pytest -v tests/
 ```
 
----
+The tests check waveform generation, the WAV header, pitch on a 440 Hz sine, harmonic extraction, spectral flatness, and the health and analyze-synthetic routes.
 
-## API Summary
+## API
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/health` | Health check and DSP status |
-| `POST` | `/api/analyze-synthetic` | Generates a waveform and returns full FFT analysis, harmonics, and audio buffer |
-| `POST` | `/api/analyze-raw` | Analyzes a client-provided raw audio sample array |
-
----
+| Method | Path | Response |
+| --- | --- | --- |
+| `GET` | `/api/health` | Status, name, and version |
+| `POST` | `/api/analyze-synthetic` | Generated samples plus FFT (pitch, centroid, rolloff, flatness, harmonics, spectrum), a spectrogram grid, oscilloscope samples, and a base64 WAV |
+| `POST` | `/api/analyze-raw` | FFT of a sample array you send |
 
 ## License
 
-Released under the MIT License.
+Released under the MIT License. See [LICENSE](LICENSE).
